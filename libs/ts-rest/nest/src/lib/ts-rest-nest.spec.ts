@@ -11,6 +11,7 @@ import {
   Controller,
   INestApplication,
   ModuleMetadata,
+  StreamableFile,
   Type,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -22,6 +23,9 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { tsRestHandler, TsRestHandler } from './ts-rest-nest-handler';
+
+import * as fs from 'node:fs';
+import path = require('path');
 
 const c = initContract();
 const postsRouter = c.router({
@@ -583,6 +587,57 @@ describe('ts-rest-nest', () => {
       expect(responseCss.status).toEqual(200);
       expect(responseCss.text).toEqual('body { color: red; }');
       expect(responseCss.header['content-type']).toEqual('text/css');
+    });
+  });
+
+  describe('can serve a streamable file', () => {
+    const c = initContract();
+    const nonJsonContract = c.router({
+      getRobots: {
+        method: 'GET',
+        path: `/robots.txt`,
+        responses: {
+          200: c.otherResponse({
+            contentType: 'text/plain',
+            body: z.unknown(),
+          }),
+        },
+      },
+    });
+
+    @TsRest({ validateResponses: true })
+    @Controller()
+    class NonJsonController
+      implements NestControllerInterface<typeof nonJsonContract>
+    {
+      @TsRest(nonJsonContract.getRobots)
+      async getRobots(@TsRestRequest() _: any) {
+        const filePath = path.join(__dirname, 'robots.txt');
+        const file = fs.createReadStream(filePath);
+        const streamable = new StreamableFile(file, {
+          // type comes from otherResponse
+          disposition: 'attachment; filename="robots.txt"',
+        });
+
+        return {
+          status: 200,
+          body: streamable,
+        } as const;
+      }
+    }
+
+    it('express', async () => {
+      const server = await initializeApp({ controllers: [NonJsonController] });
+
+      const responseTextPlain = await supertest(server).get('/robots.txt');
+      expect(responseTextPlain.status).toEqual(200);
+      expect(responseTextPlain.text.trim()).toEqual(
+        'User-agent: * Disallow: /',
+      );
+      expect(responseTextPlain.header['content-type']).toEqual('text/plain');
+      expect(responseTextPlain.header['content-disposition']).toEqual(
+        'attachment; filename="robots.txt"',
+      );
     });
   });
 

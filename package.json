@@ -14,6 +14,7 @@
     "ts-rest:build-watch": "pnpm nx run-many --target=build --projects=ts-rest-core,ts-rest-express,ts-rest-express,ts-rest-nest,ts-rest-next,ts-rest-open-api,ts-rest-react-query --parallel --watch",
     "ci:nx-affected": "yarn ts-node ./tools/workflows/nx-affected.ts",
     "postinstall": "pnpm prisma generate",
+    "test": "nx run-many --targets=test",
     "build-test-all": "nx run-many --targets=lint,test,build",
     "nx": "nx"
   },
